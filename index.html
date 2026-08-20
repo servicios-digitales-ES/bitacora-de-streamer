@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Bitácora de Streamer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-row">
+    <div class="brand">
+      <div class="brand-title">Bitácora de Streamer</div>
+      <div class="brand-sub" id="salsaDayLabel">Día Salsa —</div>
+    </div>
+    <div class="cutoff-ring">
+      <canvas id="cutoffCanvas" width="56" height="56"></canvas>
+      <div class="cutoff-label" id="cutoffLabel">--:--</div>
+    </div>
+  </div>
+  <div class="cutoff-strip">
+    <span><span class="live-dot" id="liveDot"></span><span id="shiftStateText">Sin jornada activa</span></span>
+    <span id="cutoffCountdown">Corte en --h --m</span>
+  </div>
+</div>
+
+<main>
+
+  <!-- ============ PANEL ============ -->
+  <section class="view active" id="view-panel">
+
+    <div class="shift-card">
+      <div class="shift-status-row">
+        <div>
+          <div class="shift-timer mono" id="shiftTimer">00:00:00</div>
+          <div class="shift-meta">
+            <span id="shiftBreakTime">En break: 00:00:00</span>
+          </div>
+        </div>
+        <div id="goalMiniProgress" style="text-align:right;">
+          <div class="m-label" style="font-size:10px;color:var(--text-dim);">META</div>
+          <div class="mono" style="font-size:16px;font-weight:700;color:var(--money);" id="goalMiniPct">0%</div>
+        </div>
+      </div>
+      <div class="shift-btns two" id="shiftBtnsRow">
+        <button class="btn btn-primary" id="btnStartShift">Iniciar jornada</button>
+        <button class="btn btn-outline" id="btnEditGoals">Editar metas</button>
+      </div>
+      <div class="shift-btns two" id="shiftActiveBtns" style="display:none;">
+        <button class="btn btn-outline" id="btnEditGoals2">Editar metas</button>
+        <button class="btn btn-danger" id="btnEndShift">Finalizar jornada</button>
+      </div>
+    </div>
+
+    <!-- llamada privada fuera de jornada -->
+    <div class="standalone-call" id="standaloneCallCard" style="display:none;">
+      <div class="sc-text">¿Recibiste una videollamada privada fuera de tu jornada?</div>
+      <button class="btn btn-outline" id="btnStandaloneCall">🔒 Registrar</button>
+    </div>
+
+    <!-- zona activa -->
+    <div id="zoneArea" style="display:none;">
+      <div class="zone-tabs">
+        <button class="zone-match" id="tabZoneMatch" data-zone="match">Zona Match</button>
+        <button class="zone-live" id="tabZoneLive" data-zone="live">Zona Live</button>
+      </div>
+
+      <!-- ===== ZONA MATCH ===== -->
+      <div id="zonePanelMatch">
+        <div id="openMatchBanner"></div>
+        <div class="quick-grid">
+          <div class="qbtn tone-live" id="qMatch"><span class="qicon">👤</span><span class="qlabel">MATCH</span></div>
+          <div class="qbtn tone-effective" id="qEffective" disabled><span class="qicon">✅</span><span class="qlabel">EFECTIVO</span></div>
+          <div class="qbtn tone-productive" id="qProductive" disabled><span class="qicon">💵</span><span class="qlabel">PRODUCTIVO</span></div>
+          <div class="qbtn tone-money" id="qMonetizacion"><span class="qicon">🎁</span><span class="qlabel">MONETIZACIÓN</span></div>
+          <div class="qbtn" id="qBreakMenuMatch"><span class="qicon">☕</span><span class="qlabel">BREAKS</span></div>
+          <div class="qbtn tone-live" id="qGoLive"><span class="qicon">📡</span><span class="qlabel">IR A ZONA LIVE</span></div>
+        </div>
+      </div>
+
+      <!-- ===== ZONA LIVE ===== -->
+      <div id="zonePanelLive" style="display:none;">
+        <div id="liveBannerArea"></div>
+        <div id="liveStartButtons" class="quick-grid">
+          <div class="qbtn tone-live" id="qStartLivePublic"><span class="qicon">📡</span><span class="qlabel">INICIAR LIVE PÚBLICO</span></div>
+          <div class="qbtn tone-productive" id="qStartLivePremium"><span class="qicon">🔐</span><span class="qlabel">INICIAR LIVE PREMIUM</span></div>
+          <div class="qbtn" id="qBreakMenuLive"><span class="qicon">☕</span><span class="qlabel">BREAKS</span></div>
+        </div>
+        <div id="liveActiveButtons" class="quick-grid" style="display:none;"></div>
+      </div>
+    </div>
+
+    <div class="section-title">Jornada actual</div>
+    <div class="metrics-grid">
+      <div class="metric-card accent-money">
+        <div class="m-label">Ganancia</div>
+        <div class="m-value mono" id="mUSD">$0.00</div>
+        <div class="m-sub" id="mUSDPerHour">$0.00/hora</div>
+      </div>
+      <div class="metric-card">
+        <div class="m-label">Monedas</div>
+        <div class="m-value mono" id="mCoins">0</div>
+        <div class="m-sub" id="mCoinsPerHour">0/hora</div>
+      </div>
+      <div class="metric-card">
+        <div class="m-label">Matches</div>
+        <div class="m-value mono" id="mMatches">0</div>
+        <div class="m-sub">iniciados (totales)</div>
+      </div>
+      <div class="metric-card accent-effective">
+        <div class="m-label">Efectivos</div>
+        <div class="m-value mono" id="mEffective">0</div>
+        <div class="m-sub" id="mEffPct">0% de iniciados</div>
+      </div>
+      <div class="metric-card accent-productive">
+        <div class="m-label">Productivos</div>
+        <div class="m-value mono" id="mProductive">0</div>
+        <div class="m-sub" id="mProdPct">0% de efectivos</div>
+      </div>
+      <div class="metric-card">
+        <div class="m-label">Conversión</div>
+        <div class="m-value mono" id="mConversion">0%</div>
+        <div class="m-sub" id="mConvSub">prod. / efect.</div>
+      </div>
+      <div class="metric-card">
+        <div class="m-label">Tiempo prom. a efectivo</div>
+        <div class="m-value mono" id="mTimeEff">—</div>
+        <div class="m-sub">desde match iniciado</div>
+      </div>
+      <div class="metric-card">
+        <div class="m-label">Tiempo prom. a productivo</div>
+        <div class="m-value mono" id="mTimeProd">—</div>
+        <div class="m-sub">desde match iniciado</div>
+      </div>
+      <div class="metric-card full">
+        <div class="m-label" id="goalLabel">Meta del día: $30.00</div>
+        <div class="progress-track"><div class="progress-fill" id="goalBar" style="width:0%;"></div></div>
+        <div class="m-sub" id="goalSub" style="margin-top:6px;">$0.00 de $30.00 · faltan $30.00</div>
+      </div>
+    </div>
+
+    <div class="section-title">Productividad por hora <span style="color:var(--text-faint);font-weight:400;text-transform:none;">(hoy)</span></div>
+    <div class="card" id="hourlyCard">
+      <div class="empty-note">Aún no hay actividad registrada en esta jornada.</div>
+    </div>
+
+    <div class="section-title">Registro de hoy</div>
+    <div class="card" id="todayLogCard">
+      <div class="empty-note">Sin eventos registrados todavía.</div>
+    </div>
+
+  </section>
+
+  <!-- ============ HISTORIAL ============ -->
+  <section class="view" id="view-historial">
+    <div class="section-title">Historial</div>
+    <div class="segmented" id="histRange">
+      <button class="active" data-range="day">Día</button>
+      <button data-range="week">Semana</button>
+      <button data-range="month">Mes</button>
+    </div>
+    <div class="week-picker">
+      <button id="histPrev">‹</button>
+      <div class="wp-label" id="histLabel">—</div>
+      <button id="histNext">›</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Ingresos</div>
+      <canvas class="chart-canvas" id="chartIngresos"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Conversión</div>
+      <canvas class="chart-canvas" id="chartConversion"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Matches</div>
+      <canvas class="chart-canvas" id="chartMatches"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Tiempo trabajado</div>
+      <canvas class="chart-canvas" id="chartTiempo"></canvas>
+    </div>
+
+    <div class="section-title">Jornadas registradas</div>
+    <div class="card" id="histDaysCard">
+      <div class="empty-note">No hay jornadas registradas todavía.</div>
+    </div>
+
+    <div class="section-title">Detalle del día</div>
+    <div class="card" id="histDetailCard">
+      <div class="empty-note">Selecciona un día para ver su detalle cronológico.</div>
+    </div>
+  </section>
+
+  <!-- ============ RECORDS ============ -->
+  <section class="view" id="view-records">
+    <div class="section-title">Compitiendo contra mí misma</div>
+    <div class="card" id="recordsCard">
+      <div class="empty-note">Aún no hay suficientes datos para calcular récords.</div>
+    </div>
+
+    <div class="section-title">Comparativas</div>
+    <div class="card" id="comparisonCard">
+      <div class="empty-note">Registra al menos una jornada para ver comparativas.</div>
+    </div>
+
+    <div class="section-title">Patrones detectados</div>
+    <div class="card" id="patternsCard">
+      <div class="empty-note">Se necesitan al menos 7 jornadas registradas para detectar patrones.</div>
+    </div>
+  </section>
+
+  <!-- ============ CONFIG ============ -->
+  <section class="view" id="view-config">
+    <div class="section-title">Conversión de monedas</div>
+    <div class="card">
+      <div class="field">
+        <label>Monedas por 1 USD</label>
+        <input type="number" id="cfgCoinsPerUSD" min="1" step="1">
+      </div>
+      <div class="field">
+        <label>Fórmula de conversión mostrada como "Conversión"</label>
+        <select id="cfgFormula">
+          <option value="prod_eff">productivos ÷ efectivos × 100</option>
+          <option value="prod_init">productivos ÷ iniciados × 100</option>
+        </select>
+        <div class="hint"><span class="fact-tag tag-hipotesis">Hipótesis</span>Puedes comparar este cálculo con la conversión que muestra Salsa cuando tengas ese dato.</div>
+      </div>
+      <button class="btn btn-primary" id="btnSaveConfig" style="width:100%;">Guardar</button>
+    </div>
+
+    <div class="section-title">Tarifas de videollamadas</div>
+    <div class="card">
+      <div class="hint" style="margin-bottom:8px;">
+        <span class="fact-tag tag-hecho">Hecho</span>Primeros 20s: 60 monedas (pública o privada). Al minuto: privada 120 · pública 60.
+        Estos valores se usan solo como sugerencia al registrar una llamada por duración; siempre puedes editar el monto.
+      </div>
+    </div>
+
+    <div class="section-title">Metas por defecto</div>
+    <div class="card">
+      <div class="field-row">
+        <div class="field"><label>Meta $ diaria</label><input type="number" id="cfgGoalUSD" min="0" step="0.01"></div>
+        <div class="field"><label>Meta monedas</label><input type="number" id="cfgGoalCoins" min="0" step="1"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Meta matches</label><input type="number" id="cfgGoalMatches" min="0" step="1"></div>
+        <div class="field"><label>Meta efectivos</label><input type="number" id="cfgGoalEffective" min="0" step="1"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Meta productivos</label><input type="number" id="cfgGoalProductive" min="0" step="1"></div>
+        <div class="field"><label>Meta horas</label><input type="number" id="cfgGoalHours" min="0" step="0.5"></div>
+      </div>
+      <button class="btn btn-primary" id="btnSaveGoalsDefault" style="width:100%;">Guardar metas por defecto</button>
+    </div>
+
+    <div class="section-title">Hechos observados</div>
+    <div class="card">
+      <div class="field">
+        <span class="fact-tag tag-hecho">Hecho</span>
+        <span style="font-size:12.5px;">Segundos mínimos para considerar un match efectivo</span>
+        <input type="number" id="cfgMinEffectiveSeconds" min="1" step="1" style="margin-top:8px;">
+        <div class="hint">Esto es informativo — el registro de "efectivo" sigue siendo manual, tú decides cuándo pulsar el botón.</div>
+      </div>
+    </div>
+
+    <div class="section-title">Datos</div>
+    <div class="card">
+      <div class="hint" style="margin-bottom:10px;">Los datos se guardan localmente en este navegador. Exporta seguido para no perder tu historial.</div>
+      <div class="io-row">
+        <button class="btn btn-outline" id="btnExportJSON">Exportar JSON</button>
+        <button class="btn btn-outline" id="btnExportCSV">Exportar CSV</button>
+        <button class="btn btn-outline" id="btnImportJSON">Importar JSON</button>
+        <button class="btn btn-danger" id="btnResetData">Borrar todo</button>
+      </div>
+      <input type="file" id="fileImport" accept="application/json" style="display:none;">
+    </div>
+
+    <div class="section-title">Futuro / Android</div>
+    <div class="card">
+      <div class="hint">
+        Esta es la versión web (GitHub Pages). Está preparada para envolverse luego en una APK (WebView/Capacitor).
+        El botón 🫧 prueba dos formas de ventana flotante del navegador: primero Document Picture-in-Picture, y si
+        no está disponible, cae automáticamente a Video Picture-in-Picture (dibuja las métricas en un lienzo oculto
+        y pide PiP sobre ese "video") — es la misma técnica de PiP que usan las apps de video, así que si Salsa la
+        tiene en su versión web, hay buenas chances de que también funcione en App Creator 24. Aun así, esto sigue
+        siendo una ventana flotante del navegador, no una burbuja del sistema como la de Messenger sobre cualquier
+        app — para eso se necesita el permiso nativo "mostrar sobre otras aplicaciones" con un servicio en segundo
+        plano, algo que solo se logra agregando código nativo (por ejemplo un plugin de Capacitor).
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<button class="fab-bubble" id="btnBubble" title="Convertir en burbuja flotante">🫧</button>
+
+<div class="tabbar">
+  <button class="tab-btn active" data-view="panel"><span class="ticon">🏠</span>Panel</button>
+  <button class="tab-btn" data-view="historial"><span class="ticon">📊</span>Historial</button>
+  <button class="tab-btn" data-view="records"><span class="ticon">🏆</span>Récords</button>
+  <button class="tab-btn" data-view="config"><span class="ticon">⚙️</span>Config</button>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-sheet" id="modalSheet"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
